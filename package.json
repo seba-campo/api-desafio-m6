@@ -1,0 +1,29 @@
+{
+  "name": "api-desafio-m6",
+  "version": "1.0.0",
+  "main": "index.js",
+  "author": "Sebastian Campo <campo.sebastian44@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@types/cors": "^2.8.14",
+    "body-parser": "^1.20.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "firebase": "8.7.1",
+    "firebase-admin": "^11.11.0",
+    "nanoid": "3.0.0",
+    "typescript": "^5.2.2"
+  },
+  "scripts": {
+    "dev": "nodemon --watch ./index.ts  --exec ts-node ./index.ts",
+    "build": "tsc ./index.ts",
+    "start": "node ./index.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.6.5",
+    "nodemon": "^3.0.1",
+    "process": "^0.11.10",
+    "ts-node": "^10.9.1"
+  }
+}
