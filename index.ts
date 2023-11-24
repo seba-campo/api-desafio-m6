@@ -4,6 +4,8 @@ import express from "express";
 import cors from "cors";
 import { nanoid, customAlphabet } from "nanoid";
 import { stringify } from "querystring";
+import { time } from "console";
+import { Timestamp } from "firebase-admin/firestore";
 // import * as dotenv from "dotenv"
 
 const app = express();
@@ -85,9 +87,13 @@ app.post("/rooms", (req,res)=>{
                         },
                         opponent: {
                             nombre: null,
-                            isConnected: true,
+                            isConnected: false,
                             isReady: false,
                         }
+                    },
+                    sessionPlays: {
+                        actual: {},
+                        thisSession: []
                     }
                 })
                 .then(()=>{
@@ -127,10 +133,10 @@ app.post("/rooms", (req,res)=>{
                 })
             }
         })
-})
+});
 
 
-// INGRESAR A ROOM
+// INGRESAR A ROOM   ---- retorna la room ID para la RTDB
 app.get("/rooms", (req, res)=>{
     // User ID del opponent que ingresa
     const userId = req.query.userId as string;
@@ -142,8 +148,8 @@ app.get("/rooms", (req, res)=>{
         .doc(userId)
         .get()
         .then(doc =>{
-                const userName = doc.data().nombre;
-
+            const userName = doc.data().nombre;
+            
             roomRef
                 .doc(roomId)
                 .get()
@@ -154,62 +160,131 @@ app.get("/rooms", (req, res)=>{
                         /* Ingreso a la sala, solo si:
                             isFull es false, si intenta entrar el OPPONENT o el OWNER
                         */
+                       const currentDate = new Date();
+                       const currentDayOfMonth = currentDate.getDate();
+                       const currentMonth = currentDate.getMonth();
+                       const currentYear = currentDate.getFullYear();
 
-                            // SI LO SOLICITA EL OWNER, room ya existente
-                        if(userId == actualData.participants.owner.id){
-                            res.json(actualData);
-                        }
+                       const dateString = currentDayOfMonth + "-" + (currentMonth + 1) + "-" + currentYear;
 
-                        // SI LO SOLICITA EL OPPONENT, room ya existente
-                        if(userId == actualData.participants.opponent.id){
-                            res.json(actualData);
-                        }
-
-                        //SI LO SOLICITA EL OPPONENT, primer ingreso
-                        if(actualData.isFull == false && actualData.participants.owner.id != userId){
-
-                            const newData = {
-                                "privateKey": actualData.privateKey,
-                                "participants": {
-                                    "owner":{
-                                        nombre: actualData.participants.owner.nombre,
-                                        id: actualData.participants.owner.id
-                                    },
-                                    "opponent": {
-                                        nombre: userName,
-                                        id: userId
-                                    }
-                                },
-                                "isFull": true,
-                            };
-                            
-                            roomRef
-                                .doc(roomId)
-                                .update(newData)
-                                .then(()=>{
-                                    console.log("db updated")
-                                })
-
-                            res.json(newData)
-                        }
+                        console.log({
+                            isFull: actualData.isFull,
+                            opponentId: actualData.participants.opponent.id,
+                            ownerId: actualData.participants.owner.id,
+                            requestUserId: userId,
+                            requestedAt: dateString
+                        })
 
                         // SI LO SOLICITA UN TERCERO
-                        if(userId != actualData.participants.owner.id && userId != actualData.participants.opponent.id){
+                        if(actualData.isFull && userId != actualData.participants.opponent.id && userId != actualData.participants.owner.id){
                             res.status(409).json({
                                 message: "The room is full"
                             })
-                        }
+                        } else {
+                                // SI LO SOLICITA EL OWNER, room ya existente
+                            if(userId == actualData.participants.owner.id){
+                                const newRoomRtdb = rtdb.ref("/rooms/" + actualData.privateKey);
+                                res.json(actualData);
+                            }
+
+                            // SI LO SOLICITA EL OPPONENT, room ya existente
+                            if(userId == actualData.participants.opponent.id){
+                                const newRoomRtdb = rtdb.ref("/rooms/" + actualData.privateKey);
+
+                                newRoomRtdb.once("value", (snap)=>{
+                                    const snapshot = snap.val();
+                                      newRoomRtdb.update({
+                                        participants: {
+                                            owner:{
+                                                nombre: snapshot.participants.owner.nombre,
+                                                isConnected: snapshot.participants.owner.isConnected,
+                                                isReady: snapshot.participants.owner.isReady,
+                                            },
+                                            opponent: {
+                                                nombre: userName,
+                                                isConnected: true,
+                                                isReady: false,
+                                            }
+                                        }
+                                    })
+                                })
+                                res.json(actualData);
+                            }
+
+                            //SI LO SOLICITA EL OPPONENT, primer ingreso
+                            if(actualData.isFull == false && actualData.participants.owner.id != userId){
+                                console.log("Solicita opponent primer ingreso")
+
+                                const newData = {
+                                    "privateKey": actualData.privateKey,
+                                    "participants": {
+                                        "owner":{
+                                            nombre: actualData.participants.owner.nombre,
+                                            id: actualData.participants.owner.id
+                                        },
+                                        "opponent": {
+                                            nombre: userName,
+                                            id: userId
+                                        }
+                                    },
+                                    "isFull": true,
+                                };
+                                
+                                // Seteo en el RTDB el estado connected del opponent...
+                                const newRoomRtdb = rtdb.ref("/rooms/" + actualData.privateKey);
+
+                                newRoomRtdb.once("value", (snap)=>{
+                                    const snapshot = snap.val();
+                                      newRoomRtdb.update({
+                                        participants: {
+                                            owner:{
+                                                nombre: snapshot.participants.owner.nombre,
+                                                isConnected: snapshot.participants.owner.isConnected,
+                                                isReady: snapshot.participants.owner.isReady,
+                                            },
+                                            opponent: {
+                                                nombre: userName,
+                                                isConnected: true,
+                                                isReady: false,
+                                            }
+                                        }
+                                    })
+                                })
+
+
+                                // newRoomRtdb.update({
+                                //     participants: {
+                                //         opponent: {
+                                //             nombre: userName,
+                                //             isConnected: true,
+                                //             isReady: false,
+                                //         }
+                                //     }
+                                // })
+
+                                roomRef
+                                    .doc(roomId)
+                                    .update(newData)
+                                    .then(()=>{
+                                        console.log("db updated")
+                                    })
+
+                                res.json(newData)
+                            }
+
+                        } 
                     }
-                    else { 
+                    else {
                         res.status(404).json({
                             message: "Room not found"
                         })  
                     }
                 })
         });
+});
 
-    // Busco la sala
-    
+// Pushear el historial a la ROOM
+app.post("/rooms", (req, res)=>{
 
 })
 
