@@ -1,7 +1,7 @@
 import { db, rtdb } from "./db";
-import bodyParser from "body-parser";
-import express from "express";
-import cors from "cors";
+import * as bodyParser from "body-parser";
+import * as express from "express";
+import * as cors from "cors";
 import { nanoid, customAlphabet } from "nanoid";
 import { stringify } from "querystring";
 import { time } from "console";
