@@ -92,9 +92,9 @@ app.post("/rooms", (req,res)=>{
                         }
                     },
                     sessionPlays: {
-                        actual: {},
-                        thisSession: []
-                    }
+                        actual: {owner: "", opponent:""},
+                        thisSession: [0]
+                    }                 
                 })
                 .then(()=>{
                     // Una vez creada, tomo su ID largo (privada)
@@ -118,6 +118,7 @@ app.post("/rooms", (req,res)=>{
                                 }
                             },
                             isFull: false,
+                            history: [0]
                         })
                         .then(()=>{
                             res.json({
@@ -205,7 +206,11 @@ app.get("/rooms", (req, res)=>{
                                                 isConnected: true,
                                                 isReady: false,
                                             }
-                                        }
+                                        },
+                                        sessionPlays: {
+                                            actual: {owner: "", opponent: ""},
+                                            thisSession: [0]
+                                        },
                                     })
                                 })
                                 res.json(actualData);
@@ -228,6 +233,7 @@ app.get("/rooms", (req, res)=>{
                                         }
                                     },
                                     "isFull": true,
+                                    "history": [0]
                                 };
                                 
                                 // Seteo en el RTDB el estado connected del opponent...
@@ -247,20 +253,13 @@ app.get("/rooms", (req, res)=>{
                                                 isConnected: true,
                                                 isReady: false,
                                             }
-                                        }
+                                        },
+                                        sessionPlays: {
+                                            actual: {opponent: "", owner: ""},
+                                            thisSession: [0]
+                                        },
                                     })
                                 })
-
-
-                                // newRoomRtdb.update({
-                                //     participants: {
-                                //         opponent: {
-                                //             nombre: userName,
-                                //             isConnected: true,
-                                //             isReady: false,
-                                //         }
-                                //     }
-                                // })
 
                                 roomRef
                                     .doc(roomId)
@@ -283,10 +282,40 @@ app.get("/rooms", (req, res)=>{
         });
 });
 
-// Pushear el historial a la ROOM
-app.post("/rooms", (req, res)=>{
 
-})
+app.post("/rooms/history", (req, res)=>{
+    // ID de sala (corto)
+    const roomId = req.body.roomId;
+    const play = req.body.play
+
+    roomRef.doc(roomId)
+    .get()
+    .then((doc)=>{
+        if(doc.exists){
+            const actualData = doc.data();
+
+            if(play.owner && play.opponent){
+                actualData.history.push(play)
+                roomRef.doc(roomId)
+                .update(actualData)
+                .then(()=>{
+                    console.log("Added play to history")
+                    res.status(200).json({
+                        message: "Play successfuly added to the history"
+                    })
+                })
+            }
+            else{
+                res.status(400).json({
+                    message: "The play could not be added, wrong format"
+                })
+            }
+        }
+        else{
+            res.status(404).json({message:"Room not found"})
+        }
+    });
+});
 
 app.get("/", (req, res)=>{
     rtdb.ref("test").on("value", (snapshot) => {
