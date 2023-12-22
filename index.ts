@@ -318,18 +318,11 @@ app.post("/rooms/history", (req, res)=>{
 });
 
 app.get("/", (req, res)=>{
-    rtdb.ref("test").on("value", (snapshot) => {
-        const data = snapshot.val();
-        console.log(data)
+    res.json({
+        message: "spinned"
     })
 })
 
-app.get("/db", (req, res)=>{
-    db.collection("dbTest").doc("Ftgq154aSEbFBIGa2mJ2").get()
-        .then((dbResponse)=>{
-            res.send(dbResponse.data())
-        })
-})
 
 app.listen(3000, ()=>{
     console.log("App launched in port 3000")
